@@ -1,0 +1,465 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Interactive Daisy Field with Photos</title>
+    <style>
+        :root {
+            --bg-color: #e9abb8;
+            --text-color: #222;
+        }
+
+        body {
+            margin: 0;
+            padding: 0;
+            background-color: var(--bg-color);
+            transition: background-color 0.5s ease;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            height: 100vh;
+            font-family: 'Georgia', serif;
+            overflow: hidden;
+            position: relative;
+        }
+
+        /* UI Controls Panel */
+        .controls {
+            position: absolute;
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(255, 255, 255, 0.8);
+            backdrop-filter: blur(10px);
+            padding: 15px 25px;
+            border-radius: 12px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+            display: flex;
+            gap: 20px;
+            z-index: 100;
+            font-family: 'Arial', sans-serif;
+            font-size: 14px;
+            align-items: center;
+            border: 1px solid rgba(255,255,255,0.5);
+        }
+
+        .control-group {
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+        }
+
+        label { font-weight: bold; color: #444; }
+        select, input[type="range"], button { cursor: pointer; }
+        
+        button {
+            padding: 8px 15px;
+            background: #6a9c59;
+            color: white;
+            border: none;
+            border-radius: 6px;
+            font-weight: bold;
+            transition: background 0.2s;
+        }
+        button:hover { background: #558046; }
+
+        /* Typography */
+        h1 {
+            position: absolute;
+            top: 15vh; /* Moved up slightly to make room for images */
+            font-size: 4.5rem;
+            color: var(--text-color);
+            margin: 0;
+            font-weight: normal;
+            letter-spacing: 2px;
+            opacity: 0;
+            z-index: 50;
+            transition: opacity 1s ease, color 0.5s ease;
+        }
+
+        h1.show { opacity: 1; }
+
+        /* Photo Gallery Styles */
+        .gallery {
+            position: absolute;
+            top: 30vh; /* Placed directly below the h1 */
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 15px;
+            z-index: 45;
+            opacity: 0;
+            transition: opacity 1s ease 0.5s; /* Fades in right after the text */
+            pointer-events: none; /* Prevents interaction until shown */
+        }
+
+        .gallery.show {
+            opacity: 1;
+            pointer-events: auto; /* Re-enables hover effects */
+        }
+
+        .gallery-img {
+            width: 160px;
+            height: 200px;
+            object-fit: cover;
+            background-color: #eee; /* Placeholder background color */
+            border: 8px solid white;
+            border-bottom-width: 25px; /* Creates a polaroid picture effect */
+            box-shadow: 0 6px 15px rgba(0,0,0,0.15);
+            border-radius: 2px;
+            transition: transform 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275), z-index 0s;
+            cursor: pointer;
+        }
+
+        /* Slanting the images */
+        .img-left { transform: rotate(-8deg) translateY(10px); }
+        .img-center { transform: rotate(3deg) translateY(-5px); z-index: 2; }
+        .img-right { transform: rotate(-5deg) translateY(15px); }
+
+        /* Hover Animation */
+        .gallery-img:hover {
+            transform: scale(1.15) rotate(0deg) translateY(-10px);
+            z-index: 10;
+            box-shadow: 0 12px 25px rgba(0,0,0,0.25);
+        }
+
+        /* Containers */
+        #field {
+            position: absolute;
+            bottom: 0;
+            width: 100%;
+            height: 60vh;
+            display: flex;
+            justify-content: center;
+            align-items: flex-end;
+            z-index: 10;
+        }
+
+        #sparkles {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 5;
+        }
+
+        /* Dynamic Flower Component */
+        .flower-wrapper {
+            position: absolute;
+            bottom: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: flex-end;
+            transform-origin: bottom center;
+        }
+
+        .stem {
+            width: 6px;
+            background-color: #6a9c59;
+            border-radius: 3px;
+            transform: scaleY(0);
+            transform-origin: bottom;
+            animation: grow var(--grow-duration) ease-out forwards var(--delay);
+        }
+
+        .leaf {
+            position: absolute;
+            width: 50px;
+            height: 25px;
+            background-color: #6a9c59;
+            border-radius: 50% 0 50% 0;
+            opacity: 0;
+        }
+
+        .leaf.left {
+            left: -45px;
+            transform-origin: bottom right;
+            animation: sprout-left calc(var(--grow-duration) * 0.5) ease-out forwards calc(var(--delay) + var(--grow-duration) * 0.4);
+        }
+
+        .leaf.right {
+            right: -45px;
+            transform-origin: bottom left;
+            animation: sprout-right calc(var(--grow-duration) * 0.5) ease-out forwards calc(var(--delay) + var(--grow-duration) * 0.5);
+        }
+
+        .daisy {
+            position: absolute;
+            top: 0;
+            width: 100px;
+            height: 100px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            transform: scale(0);
+            animation: bloom calc(var(--grow-duration) * 0.6) cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards calc(var(--delay) + var(--grow-duration) * 0.8);
+        }
+
+        .center {
+            width: 35px;
+            height: 35px;
+            background: radial-gradient(circle, #ffeb3b 30%, #fbc02d 100%);
+            border-radius: 50%;
+            z-index: 2;
+            box-shadow: 0 0 10px rgba(255, 235, 59, 0.5);
+        }
+
+        .petals { position: absolute; width: 100%; height: 100%; z-index: 1; }
+
+        .petal {
+            position: absolute;
+            top: -10px;
+            left: 42px;
+            width: 16px;
+            height: 60px;
+            background-color: #fff;
+            border: 1px solid #eaeaea;
+            border-radius: 50% 50% 50% 50% / 60% 60% 40% 40%;
+            transform-origin: 8px 60px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+        }
+
+        /* Sparkle Particles */
+        .sparkle {
+            position: absolute;
+            background: #ffeb3b;
+            border-radius: 50%;
+            box-shadow: 0 0 8px 2px rgba(255, 235, 59, 0.6);
+            opacity: 0;
+            animation: float-up linear forwards;
+        }
+
+        /* Keyframes */
+        @keyframes grow { to { transform: scaleY(1); } }
+        @keyframes sprout-left {
+            from { transform: scale(0) rotate(20deg); opacity: 0; }
+            to { transform: scale(1) rotate(-40deg); opacity: 1; }
+        }
+        @keyframes sprout-right {
+            from { transform: scale(0) rotate(-20deg); opacity: 0; }
+            to { transform: scale(1) scaleX(-1) rotate(-30deg); opacity: 1; }
+        }
+        @keyframes bloom { to { transform: scale(1); } }
+        @keyframes float-up {
+            0% { transform: translateY(0) scale(0.5); opacity: 0; }
+            20% { opacity: 0.8; }
+            80% { opacity: 0.8; }
+            100% { transform: translateY(-200px) scale(1.5); opacity: 0; }
+        }
+
+        /* Themes */
+        body.theme-sunset {
+            --bg-color: #ffebd6;
+            --text-color: #5c3a21;
+        }
+        body.theme-night {
+            --bg-color: #0f172a;
+            --text-color: #f1f5f9;
+        }
+        body.theme-night .controls {
+            background: rgba(15, 23, 42, 0.8);
+            color: #fff;
+            border-color: rgba(255,255,255,0.2);
+        }
+        body.theme-night label { color: #cbd5e1; }
+        
+        /* Adjust photo borders for night mode to pop */
+        body.theme-night .gallery-img { border-color: #f1f5f9; box-shadow: 0 6px 20px rgba(0,0,0,0.6); }
+
+    </style>
+</head>
+<body>
+
+    <div class="controls">
+        <div class="control-group">
+            <label>Theme</label>
+            <select id="themeSelect">
+                <option value="white">Clean White</option>
+                <option value="sunset">Sunset Glow</option>
+                <option value="night">Magical Night</option>
+            </select>
+        </div>
+        <div class="control-group">
+            <label>Flowers (<span id="flowerCountLabel">15</span>)</label>
+            <input type="range" id="flowerCount" min="3" max="40" value="15">
+        </div>
+        <div class="control-group">
+            <label>Sparkles (<span id="sparkleLabel">Medium</span>)</label>
+            <input type="range" id="sparkleIntensity" min="0" max="100" value="50">
+        </div>
+        <div class="control-group">
+            <label>Speed</label>
+            <input type="range" id="growthSpeed" min="1" max="5" value="3">
+        </div>
+        <div class="control-group">
+            <label>Bloom Style</label>
+            <select id="bloomStyle">
+                <option value="wave">Sequential Wave</option>
+                <option value="simultaneous">Simultaneous</option>
+                <option value="random">Random Sprout</option>
+            </select>
+        </div>
+        <button id="replayBtn">Replay Animation</button>
+    </div>
+
+    <h1 id="thankYouText" style="font-size:35px; text-align: center;">Thank You! mabengggg iloveyouuuu always in all wayssss</h1>
+
+    
+    <div id="imageGallery" class="gallery">
+        <img src="edf.jpg" alt="mabong " class="gallery-img img-left">
+        <img src="edr.jpg" alt="mabong " class="gallery-img img-center">
+        <img src="edw.jpg" alt="mabong " class="gallery-img img-right">
+    </div>
+
+    <div id="sparkles"></div>
+    <div id="field"></div>
+
+    <script>
+        // DOM Elements
+        const field = document.getElementById('field');
+        const sparklesContainer = document.getElementById('sparkles');
+        const thankYouText = document.getElementById('thankYouText');
+        const imageGallery = document.getElementById('imageGallery');
+        let sparkleInterval;
+
+        // UI Controls
+        const inputs = {
+            theme: document.getElementById('themeSelect'),
+            count: document.getElementById('flowerCount'),
+            sparkle: document.getElementById('sparkleIntensity'),
+            speed: document.getElementById('growthSpeed'),
+            style: document.getElementById('bloomStyle'),
+            replay: document.getElementById('replayBtn')
+        };
+
+        // Update Labels
+        inputs.count.addEventListener('input', (e) => document.getElementById('flowerCountLabel').innerText = e.target.value);
+        inputs.sparkle.addEventListener('input', (e) => {
+            const val = e.target.value;
+            let label = "Low";
+            if (val > 30) label = "Medium";
+            if (val > 70) label = "High";
+            if (val == 0) label = "Off";
+            document.getElementById('sparkleLabel').innerText = label;
+        });
+
+        // Theme Switcher
+        inputs.theme.addEventListener('change', (e) => {
+            document.body.className = e.target.value === 'white' ? '' : `theme-${e.target.value}`;
+        });
+
+        // Generate a single flower HTML string
+        function getFlowerHTML(height) {
+            let petalsHTML = '';
+            for(let i = 0; i < 12; i++) {
+                petalsHTML += `<div class="petal" style="transform: rotate(${i * 30}deg)"></div>`;
+            }
+            
+            const leafLeftBottom = height * 0.4 + (Math.random() * 20 - 10);
+            const leafRightBottom = height * 0.6 + (Math.random() * 20 - 10);
+
+            return `
+                <div class="leaf left" style="bottom: ${leafLeftBottom}px"></div>
+                <div class="leaf right" style="bottom: ${leafRightBottom}px"></div>
+                <div class="stem" style="height: ${height}px"></div>
+                <div class="daisy" style="bottom: ${height - 10}px">
+                    <div class="petals">${petalsHTML}</div>
+                    <div class="center"></div>
+                </div>
+            `;
+        }
+
+        // Main Animation Trigger
+        function plantGarden() {
+            // Reset
+            field.innerHTML = '';
+            thankYouText.classList.remove('show');
+            imageGallery.classList.remove('show');
+            clearInterval(sparkleInterval);
+            sparklesContainer.innerHTML = '';
+
+            const count = parseInt(inputs.count.value);
+            const speedVal = parseInt(inputs.speed.value);
+            const style = inputs.style.value;
+            const sparkleIntensity = parseInt(inputs.sparkle.value);
+
+            const baseDuration = 3.5 - (speedVal * 0.5); 
+            let maxDelay = 0;
+
+            for (let i = 0; i < count; i++) {
+                const wrapper = document.createElement('div');
+                wrapper.className = 'flower-wrapper';
+                
+                const height = 150 + Math.random() * 200; 
+                const xPos = (Math.random() * 90) + 5; 
+                const scale = 0.6 + Math.random() * 0.6; 
+                
+                let delay = 0;
+                if (style === 'wave') {
+                    delay = (xPos / 100) * 2; 
+                } else if (style === 'random') {
+                    delay = Math.random() * 2;
+                }
+                
+                maxDelay = Math.max(maxDelay, delay);
+
+                wrapper.style.left = `${xPos}%`;
+                wrapper.style.transform = `scale(${scale})`;
+                
+                wrapper.style.setProperty('--grow-duration', `${baseDuration}s`);
+                wrapper.style.setProperty('--delay', `${delay}s`);
+
+                wrapper.innerHTML = getFlowerHTML(height);
+                field.appendChild(wrapper);
+            }
+
+            // Start Sparkles
+            if (sparkleIntensity > 0) {
+                const intervalTime = 1000 - (sparkleIntensity * 9); 
+                sparkleInterval = setInterval(createSparkle, intervalTime);
+            }
+
+            // Show Text and Images after the last flower blooms
+            const totalAnimationTime = (maxDelay + baseDuration + 0.5) * 1000;
+            setTimeout(() => {
+                thankYouText.classList.add('show');
+                imageGallery.classList.add('show');
+            }, totalAnimationTime);
+        }
+
+        // Particle System
+        function createSparkle() {
+            const sparkle = document.createElement('div');
+            sparkle.className = 'sparkle';
+            
+            const size = Math.random() * 6 + 2;
+            sparkle.style.width = `${size}px`;
+            sparkle.style.height = `${size}px`;
+            
+            sparkle.style.left = `${Math.random() * 100}%`;
+            sparkle.style.top = `${Math.random() * 100}%`;
+            
+            const duration = 2 + Math.random() * 3;
+            sparkle.style.animationDuration = `${duration}s`;
+
+            sparklesContainer.appendChild(sparkle);
+
+            setTimeout(() => sparkle.remove(), duration * 1000);
+        }
+
+        // Event Listeners
+        inputs.replay.addEventListener('click', plantGarden);
+        [inputs.count, inputs.speed, inputs.style, inputs.sparkle].forEach(input => {
+            input.addEventListener('change', plantGarden);
+        });
+
+        // Initialize on load
+        window.onload = plantGarden;
+
+    </script>
+</body>
+</html>
